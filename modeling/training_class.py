@@ -14,9 +14,15 @@ from sklearn.linear_model import ElasticNet
 
 
 class TrainingPipeline(mlflow.pyfunc.PythonModel):
-      
+    '''
+    Training object for the generation of a random tree and a gradientboosting model.
+    '''
+
+
     def __init__(self, **kwds):
+        # Select if comments should be displayed
         self.verbose = True
+        # Default grid parameters for the parameter grid search (hyperparameters tunning)
         self.grid_params = {
         "trees": {'model__max_features': ['auto', 'sqrt'],
                'model__max_depth': [int(x) for x in np.linspace(10, 110, num = 11)],
@@ -37,25 +43,39 @@ class TrainingPipeline(mlflow.pyfunc.PythonModel):
                         "model__l1_ratio": [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]}
 
         }
+        # Default generic models for the feature selection
         self.generic_models = {"gradientboost": GradientBoostingRegressor(n_estimators=500, max_depth=4, min_samples_split=5, learning_rate = 0.01,loss = "squared_error"),
         "trees": DecisionTreeRegressor(random_state=0), "elasticnet":ElasticNet()
         }
+        # Template models for the training
         self.template_models = {"gradientboost": GradientBoostingRegressor, "trees": DecisionTreeRegressor, "elasticnet":ElasticNet}
         super().__init__(**kwds)
         return
 
 
     def hyperparam_search(self,X, Y, train_param, is_scaled):
+        ''' Function that performs the parameters grid search
+        args:
+            -X: Features array
+            -Y: Target array
+            -train_param: Dic with the training configuration
+            -is_scaled: Boolean that indicates if the data is scaled
+        returns:
+            -dict: Best hyperparameters for the model
+        '''
+        # Select the template model for grid search
         model = self.template_models[train_param["hypotesis_model"]]()
+        # Select parameters grid
         if "param_grid" in train_param["hyperparam"]:
             print("------- hypermarameter grid search using user param_grid dictionary")
             param_grid = train_param["hyperparam"]["param_grid"]
         else:
             print("------- hypermarameter grid search using default grid search dictionary")
             param_grid = self.grid_params[train_param["hypotesis_model"]]
-        
+        # Perform scaling to the data
         if is_scaled:
             print("------- hypermarameter grid search with cv 4 partitions and scaling the inputs")
+            # Define a ml pipeline to perform the scaling on each training set in the cross validation
             pipeline_ml = Pipeline([('scaler',  StandardScaler()), ('model', model)])
         else:
             print("------- hypermarameter grid search with cv 4 partitions")   
@@ -68,14 +88,31 @@ class TrainingPipeline(mlflow.pyfunc.PythonModel):
 
 
     def _get_variable_importance(self, X, model):
+        ''' Function that computes the variable importance on each row
+        args:
+            -X: Features array
+            -model: scikitlearn model
+        returns:
+            -dataframe with features and importance
+        '''
+        # Extract feature importance from model object
         imp_var = model.feature_importances_
+        # Create a dictionary with the column names and importance
         imp_var_dict = dict(zip(X.columns, imp_var))
+        # Convert the dict to a datframe
         imp_var_df = pd.DataFrame(list(imp_var_dict.items()), columns=['variable', 'importance_split'])
         imp_var_df.sort_values('importance_split', ascending=False, inplace=True)
         return imp_var_df
 
 
     def _feature_importance(self, X, model, importance_treshold = 0.01, min_features = 5):
+        ''' Function that select the most important features
+        args:
+            -X: Features array
+            -model: scikitlearn model
+        returns:
+            -list with the most important features
+        '''
         # Function to select important features
         imp_df=self._get_variable_importance(X, model)
         # Sort by Importance Split Ascending order
@@ -90,6 +127,15 @@ class TrainingPipeline(mlflow.pyfunc.PythonModel):
 
 
     def _feature_selection(self,X,Y,train_param, is_scaled):
+        ''' Function with the main logic for the feature selection
+        args:
+            -X: Features array
+            -Y: Target array
+            -train_param: Dic with the training configuration
+            -is_scaled: Boolean that indicates if the data is scaled
+        returns:
+            -list with the most important features
+        '''
         if is_scaled:
             print("------- Standarizing data with mean 0 std of 1")
             scaler = StandardScaler()
@@ -100,11 +146,17 @@ class TrainingPipeline(mlflow.pyfunc.PythonModel):
         print("------- Training model for feature selection")
         model = gen_model.fit(X, Y)
         print("------- Compute feature importance")
+        # Compute feature importance
         important_features = self._feature_importance(X, model)
         return important_features
 
 
     def fit(self, data, train_param):
+        ''' Function with the main logic for the training
+        args:
+            -data: Dataframe with the features set and the target
+            -train_param: Dic with the training configuration
+        '''        
         self.train_param = train_param
         is_scaled = train_param["scale"]
         # Split in train - test sets
@@ -166,9 +218,7 @@ class TrainingPipeline(mlflow.pyfunc.PythonModel):
 
 
     def Model_metrics(self):
-        '''Description: Metrics for the evaluation of the model
-        Args:
-            -df: Test dataframe
+        '''Description: Metrics for the evaluation of the model in training and test
         '''
         print("Starting model evaluation")
         Y_train_pred = self.predict_proba(self.X_train)
@@ -185,6 +235,12 @@ class TrainingPipeline(mlflow.pyfunc.PythonModel):
 
 
     def predict_proba(self, X_in):
+        ''' Function that perform the predict in the model 
+        args:
+            -X_in: Features array
+        returns:
+            -Y_pred: Array with predictions
+        '''
         X_in = X_in[self.features_names]
         is_scaled = self.train_param["scale"]
         if is_scaled:
@@ -197,6 +253,13 @@ class TrainingPipeline(mlflow.pyfunc.PythonModel):
   
 
     def shap_explain_plot(self, X_in):
+        ''' Function that compute the shap values and generate the absolute shap values summary
+        args:
+            -X_in: Features array
+        returns:
+            -matplotlib figure object
+        '''
+        # Perform scaling on the data
         X_in = X_in[self.features_names]
         is_scaled = self.train_param["scale"]
         if is_scaled:

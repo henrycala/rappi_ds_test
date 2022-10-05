@@ -25,7 +25,7 @@ In <b> initial_data_exploration.ipynb </b> is performed the computation of basic
 In <b>price_vs_variables.ipynb </b> is performed an analysis to mesure the relationship between the different variables and the price. In this notebook we can find scatter plots and box plot analysis under different grouping variables. Also, is include a colinearity analysis and a location analysis to determinate the linear dependencies between the variables and the importance of the location in the price, respectively.
 
 ## Model training
-In <b>ml_training.ipynb</b> is developed the main data processing flow. In this notebook is imported the training class from the file training_class.py. Two machine learning models were tested: random forest and ensembled boosted models. The performance tracking and the artifacts of the models are stored using mlflow.
+In <b>ml_training.ipynb</b> is developed the main data processing flow. In this notebook is imported the training class from the file training_class.py. Two machine learning models were tested: random forest and ensembled boosted models. The performance tracking and the artifacts of the models are stored using mlflow. <br>
 
-For all the notebooks is created a html version to visualizate the results.
+To generate the model you must run ml_training.ipynb. For all the notebooks is created a html version to visualizate the results.
  
